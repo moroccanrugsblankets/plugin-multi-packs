@@ -17,4 +17,3 @@ Plugin WordPress/WooCommerce ajoutant une interface de commande par lots sous la
 - `/plugin-multi-packs.php` : point d'entrée du plugin.
 - `/includes/class-wc-multi-packs-plugin.php` : logique admin, front-end et panier.
 - `/assets/css/wc-multi-packs.css` : styles front-end minimaux.
-- `/assets/js/wc-multi-packs.js` : interactions quantité +/- par ligne.

@@ -153,7 +153,7 @@ final class WC_Multi_Packs_Plugin {
 	public function register_product_meta_box(): void {
 		add_meta_box(
 			'wc-multi-packs',
-			__('Gestion des Packs', 'plugin-multi-packs'),
+			__('Pack Management', 'plugin-multi-packs'),
 			[$this, 'render_product_meta_box'],
 			'product',
 			'normal',
@@ -192,7 +192,7 @@ final class WC_Multi_Packs_Plugin {
 				<?php endforeach; ?>
 			</div>
 			<p>
-				<button type="button" class="button" data-add-group><?php esc_html_e('Ajouter un groupe', 'plugin-multi-packs'); ?></button>
+				<button type="button" class="button" data-add-group><?php esc_html_e('Add group', 'plugin-multi-packs'); ?></button>
 			</p>
 		</div>
 		<script type="text/html" id="tmpl-wc-multi-packs-group">
@@ -217,31 +217,31 @@ final class WC_Multi_Packs_Plugin {
 		?>
 		<div class="wc-multi-packs-admin__group postbox">
 			<div class="postbox-header">
-				<h2 class="hndle"><?php esc_html_e('Groupe de packs', 'plugin-multi-packs'); ?></h2>
+				<h2 class="hndle"><?php esc_html_e('Pack group', 'plugin-multi-packs'); ?></h2>
 				<div class="handle-actions">
-					<button type="button" class="button-link-delete" data-remove-group><?php esc_html_e('Supprimer', 'plugin-multi-packs'); ?></button>
+					<button type="button" class="button-link-delete" data-remove-group><?php esc_html_e('Remove', 'plugin-multi-packs'); ?></button>
 				</div>
 			</div>
 			<div class="inside">
 				<p>
 					<label>
-						<strong><?php esc_html_e('Titre du groupe', 'plugin-multi-packs'); ?></strong><br />
+						<strong><?php esc_html_e('Group title', 'plugin-multi-packs'); ?></strong><br />
 						<input type="text" class="widefat" name="wc_multi_packs_groups[<?php echo esc_attr((string) $group_index); ?>][group_title]" value="<?php echo esc_attr((string) $group['group_title']); ?>" />
 					</label>
 				</p>
 				<p>
 					<label>
-						<strong><?php esc_html_e('Paliers spécifiques (optionnel)', 'plugin-multi-packs'); ?></strong><br />
-						<input type="text" class="widefat" name="wc_multi_packs_groups[<?php echo esc_attr((string) $group_index); ?>][tiers_override]" value="<?php echo esc_attr((string) $group['tiers_override']); ?>" placeholder="<?php esc_attr_e('Ex: 6, 12, 24', 'plugin-multi-packs'); ?>" />
+						<strong><?php esc_html_e('Specific tiers (optional)', 'plugin-multi-packs'); ?></strong><br />
+						<input type="text" class="widefat" name="wc_multi_packs_groups[<?php echo esc_attr((string) $group_index); ?>][tiers_override]" value="<?php echo esc_attr((string) $group['tiers_override']); ?>" placeholder="<?php esc_attr_e('Example: 6, 12, 24', 'plugin-multi-packs'); ?>" />
 					</label>
 				</p>
 				<table class="widefat striped">
 					<thead>
 						<tr>
-							<th><?php esc_html_e('Conditionnement', 'plugin-multi-packs'); ?></th>
-							<th><?php esc_html_e('Unités / lot', 'plugin-multi-packs'); ?></th>
+							<th><?php esc_html_e('Packaging', 'plugin-multi-packs'); ?></th>
+							<th><?php esc_html_e('Units / pack', 'plugin-multi-packs'); ?></th>
 							<th><?php esc_html_e('Mode', 'plugin-multi-packs'); ?></th>
-							<th><?php esc_html_e('BOGO / Prix fixe', 'plugin-multi-packs'); ?></th>
+							<th><?php esc_html_e('BOGO / Fixed price', 'plugin-multi-packs'); ?></th>
 							<th><?php esc_html_e('Action', 'plugin-multi-packs'); ?></th>
 						</tr>
 					</thead>
@@ -252,7 +252,7 @@ final class WC_Multi_Packs_Plugin {
 					</tbody>
 				</table>
 				<p>
-					<button type="button" class="button" data-add-line data-group-index="<?php echo esc_attr((string) $group_index); ?>"><?php esc_html_e('Ajouter une ligne', 'plugin-multi-packs'); ?></button>
+					<button type="button" class="button" data-add-line data-group-index="<?php echo esc_attr((string) $group_index); ?>"><?php esc_html_e('Add line', 'plugin-multi-packs'); ?></button>
 				</p>
 			</div>
 		</div>
@@ -283,23 +283,23 @@ final class WC_Multi_Packs_Plugin {
 			<td>
 				<select name="<?php echo esc_attr($name); ?>[mode]" data-pack-mode>
 					<option value="bogo" <?php selected('bogo', $line['mode']); ?>><?php esc_html_e('BOGO', 'plugin-multi-packs'); ?></option>
-					<option value="fixed" <?php selected('fixed', $line['mode']); ?>><?php esc_html_e('Prix fixe', 'plugin-multi-packs'); ?></option>
+					<option value="fixed" <?php selected('fixed', $line['mode']); ?>><?php esc_html_e('Fixed price', 'plugin-multi-packs'); ?></option>
 				</select>
 			</td>
 			<td>
 				<div class="wc-multi-packs-admin__mode-fields" data-mode-fields>
 					<span data-mode="bogo">
-						<input type="number" class="small-text" min="0" step="1" name="<?php echo esc_attr($name); ?>[bogo_buy]" value="<?php echo esc_attr((string) $line['bogo_buy']); ?>" placeholder="<?php esc_attr_e('Achetés', 'plugin-multi-packs'); ?>" />
+						<input type="number" class="small-text" min="0" step="1" name="<?php echo esc_attr($name); ?>[bogo_buy]" value="<?php echo esc_attr((string) $line['bogo_buy']); ?>" placeholder="<?php esc_attr_e('Bought', 'plugin-multi-packs'); ?>" />
 						+
-						<input type="number" class="small-text" min="0" step="1" name="<?php echo esc_attr($name); ?>[bogo_free]" value="<?php echo esc_attr((string) $line['bogo_free']); ?>" placeholder="<?php esc_attr_e('Offerts', 'plugin-multi-packs'); ?>" />
+						<input type="number" class="small-text" min="0" step="1" name="<?php echo esc_attr($name); ?>[bogo_free]" value="<?php echo esc_attr((string) $line['bogo_free']); ?>" placeholder="<?php esc_attr_e('Free', 'plugin-multi-packs'); ?>" />
 					</span>
 					<span data-mode="fixed">
-						<input type="number" class="small-text" min="0" step="0.01" name="<?php echo esc_attr($name); ?>[fixed_price]" value="<?php echo esc_attr((string) $line['fixed_price']); ?>" placeholder="<?php esc_attr_e('Prix du lot', 'plugin-multi-packs'); ?>" />
+						<input type="number" class="small-text" min="0" step="0.01" name="<?php echo esc_attr($name); ?>[fixed_price]" value="<?php echo esc_attr((string) $line['fixed_price']); ?>" placeholder="<?php esc_attr_e('Pack price', 'plugin-multi-packs'); ?>" />
 					</span>
 				</div>
 			</td>
 			<td>
-				<button type="button" class="button-link-delete" data-remove-line><?php esc_html_e('Supprimer', 'plugin-multi-packs'); ?></button>
+				<button type="button" class="button-link-delete" data-remove-line><?php esc_html_e('Remove', 'plugin-multi-packs'); ?></button>
 			</td>
 		</tr>
 		<?php
@@ -363,9 +363,10 @@ final class WC_Multi_Packs_Plugin {
 		}
 
 		wp_register_style('wc-multi-packs', WC_MULTI_PACKS_URL . 'assets/css/wc-multi-packs.css', [], '1.0.0');
-		wp_register_script('wc-multi-packs', WC_MULTI_PACKS_URL . 'assets/js/wc-multi-packs.js', [], '1.0.0', true);
+		wp_register_script('wc-multi-packs', '', [], '1.0.0', true);
 		wp_enqueue_style('wc-multi-packs');
 		wp_enqueue_script('wc-multi-packs');
+		wp_add_inline_script('wc-multi-packs', $this->get_front_script());
 
 		$settings = $this->get_settings();
 		if ('' !== trim($settings['custom_css'])) {
@@ -395,7 +396,7 @@ final class WC_Multi_Packs_Plugin {
 
 		?>
 		<div class="wc-multi-packs">
-			<h3 class="wc-multi-packs__title"><?php esc_html_e('Commander par lots', 'plugin-multi-packs'); ?></h3>
+			<h3 class="wc-multi-packs__title"><?php esc_html_e('Order by packs', 'plugin-multi-packs'); ?></h3>
 			<?php foreach ($groups as $group_index => $group) : ?>
 				<div class="wc-multi-packs__group">
 					<?php if (! empty($group['group_title'])) : ?>
@@ -404,10 +405,10 @@ final class WC_Multi_Packs_Plugin {
 					<table class="shop_table wc-multi-packs__table">
 						<thead>
 							<tr>
-								<th><?php esc_html_e('Qté', 'plugin-multi-packs'); ?></th>
-								<th><?php esc_html_e('Cond.', 'plugin-multi-packs'); ?></th>
-								<th><?php esc_html_e('Prix', 'plugin-multi-packs'); ?></th>
-								<th><?php esc_html_e('Ajout', 'plugin-multi-packs'); ?></th>
+								<th><?php esc_html_e('Qty', 'plugin-multi-packs'); ?></th>
+								<th><?php esc_html_e('Pack', 'plugin-multi-packs'); ?></th>
+								<th><?php esc_html_e('Price', 'plugin-multi-packs'); ?></th>
+								<th><?php esc_html_e('Add', 'plugin-multi-packs'); ?></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -435,7 +436,7 @@ final class WC_Multi_Packs_Plugin {
 											<input type="hidden" name="wc_multi_packs_line_index" value="<?php echo esc_attr((string) $line_index); ?>" />
 											<input type="hidden" name="wc_multi_packs_quantity" value="1" data-pack-quantity-input />
 											<?php wp_nonce_field(self::NONCE_ACTION, self::NONCE_NAME); ?>
-											<button type="submit" class="button alt"><?php esc_html_e('AJOUTER', 'plugin-multi-packs'); ?></button>
+											<button type="submit" class="button alt"><?php esc_html_e('ADD', 'plugin-multi-packs'); ?></button>
 										</form>
 									</td>
 								</tr>
@@ -756,5 +757,9 @@ JS;
 
 	private function get_admin_style(): string {
 		return '.wc-multi-packs-admin__mode-fields span{display:inline-flex;gap:6px;align-items:center}.wc-multi-packs-admin__group{margin-bottom:16px}.wc-multi-packs-admin__group .inside{padding-top:12px}';
+	}
+
+	private function get_front_script(): string {
+		return "document.addEventListener('click',function(event){const button=event.target.closest('[data-pack-increment],[data-pack-decrement]');if(!button){return;}const wrapper=button.closest('[data-pack-quantity]');const input=wrapper?wrapper.querySelector(\"input[type='number']\"):null;if(!input){return;}const current=Math.max(1,parseInt(input.value||'1',10));input.value=button.hasAttribute('data-pack-increment')?current+1:Math.max(1,current-1);input.dispatchEvent(new Event('input',{bubbles:true}));});document.addEventListener('input',function(event){const input=event.target.closest(\".wc-multi-packs__quantity input[type='number']\");if(!input){return;}const row=input.closest('tr');const target=row?row.querySelector('[data-pack-quantity-input]'):null;if(target){target.value=Math.max(1,parseInt(input.value||'1',10));}});";
 	}
 }

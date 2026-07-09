@@ -12,10 +12,11 @@ if (! defined('ABSPATH')) {
 }
 
 final class WC_Multi_Packs_Plugin {
-	private const OPTION_KEY = 'wc_multi_packs_settings';
-	private const META_KEY = '_wc_multi_packs_groups';
-	private const NONCE_ACTION = 'wc_multi_packs_add_to_cart';
-	private const NONCE_NAME = 'wc_multi_packs_nonce';
+	private const OPTION_KEY      = 'wc_multi_packs_settings';
+	private const META_KEY        = '_wc_multi_packs_groups';
+	private const META_DISABLED   = '_wc_multi_packs_disabled';
+	private const NONCE_ACTION    = 'wc_multi_packs_add_to_cart';
+	private const NONCE_NAME      = 'wc_multi_packs_nonce';
 
 	private static ?self $instance = null;
 
@@ -68,9 +69,17 @@ final class WC_Multi_Packs_Plugin {
 			'wc_multi_packs_main',
 			__('Global pack settings', 'plugin-multi-packs'),
 			static function (): void {
-				echo '<p>' . esc_html__('Configure default pack values and optional storefront custom code.', 'plugin-multi-packs') . '</p>';
+				echo '<p>' . esc_html__('Configure default pack groups applied to all products. Per-product groups override these settings.', 'plugin-multi-packs') . '</p>';
 			},
 			'wc_multi_packs'
+		);
+
+		add_settings_field(
+			'global_groups',
+			__('Default pack groups', 'plugin-multi-packs'),
+			[$this, 'render_global_groups_field'],
+			'wc_multi_packs',
+			'wc_multi_packs_main'
 		);
 
 		add_settings_field(
@@ -103,6 +112,7 @@ final class WC_Multi_Packs_Plugin {
 
 		return [
 			'default_tiers' => $this->sanitize_tiers_text($settings['default_tiers'] ?? ''),
+			'global_groups' => $this->sanitize_groups($settings['global_groups'] ?? []),
 			'custom_css'    => sanitize_textarea_field(wp_unslash((string) ($settings['custom_css'] ?? ''))),
 			'custom_js'     => sanitize_textarea_field(wp_unslash((string) ($settings['custom_js'] ?? ''))),
 		];
@@ -150,6 +160,49 @@ final class WC_Multi_Packs_Plugin {
 		<?php
 	}
 
+	public function render_global_groups_field(): void {
+		$settings      = $this->get_settings();
+		$groups        = $settings['global_groups'] ?? [];
+		$name_base     = self::OPTION_KEY . '[global_groups]';
+		$line_template = [
+			'pack_label'     => '',
+			'units_per_pack' => '',
+			'mode'           => 'bogo',
+			'bogo_buy'       => '',
+			'bogo_free'      => '',
+			'fixed_price'    => '',
+		];
+
+		if ([] === $groups) {
+			$groups = [
+				[
+					'group_title'    => '',
+					'tiers_override' => '',
+					'lines'          => [$line_template],
+				],
+			];
+		}
+		?>
+		<div class="wc-multi-packs-admin" data-name-base="<?php echo esc_attr($name_base); ?>">
+			<p class="description"><?php esc_html_e('These groups are displayed on every product page. Products with their own groups configured below will use those instead.', 'plugin-multi-packs'); ?></p>
+			<div class="wc-multi-packs-admin__groups" data-groups>
+				<?php foreach ($groups as $group_index => $group) : ?>
+					<?php $this->render_group_editor($group_index, $group, false, $name_base); ?>
+				<?php endforeach; ?>
+			</div>
+			<p>
+				<button type="button" class="button" data-add-group><?php esc_html_e('Add group', 'plugin-multi-packs'); ?></button>
+			</p>
+		</div>
+		<script type="text/html" id="tmpl-wc-multi-packs-group">
+			<?php $this->render_group_editor('__group_index__', ['group_title' => '', 'tiers_override' => '', 'lines' => [$line_template]], true); ?>
+		</script>
+		<script type="text/html" id="tmpl-wc-multi-packs-line">
+			<?php $this->render_line_editor('__group_index__', '__line_index__', $line_template, true); ?>
+		</script>
+		<?php
+	}
+
 	public function register_product_meta_box(): void {
 		add_meta_box(
 			'wc-multi-packs',
@@ -164,9 +217,11 @@ final class WC_Multi_Packs_Plugin {
 	public function render_product_meta_box(\WP_Post $post): void {
 		wp_nonce_field('wc_multi_packs_save_meta_box', 'wc_multi_packs_meta_box_nonce');
 
-		$groups        = $this->get_product_groups($post->ID);
-		$global_tiers  = $this->get_settings()['default_tiers'];
-		$line_template = [
+		$groups           = $this->get_raw_product_groups($post->ID);
+		$is_disabled      = (bool) get_post_meta($post->ID, self::META_DISABLED, true);
+		$has_custom_groups = [] !== $groups;
+		$global_tiers     = $this->get_settings()['default_tiers'];
+		$line_template    = [
 			'pack_label'     => '',
 			'units_per_pack' => '',
 			'mode'           => 'bogo',
@@ -184,11 +239,22 @@ final class WC_Multi_Packs_Plugin {
 			];
 		}
 		?>
-		<div class="wc-multi-packs-admin" data-default-tiers="<?php echo esc_attr($global_tiers); ?>">
-			<p><?php esc_html_e('Add one or more pack groups. Each row can use a BOGO discount or a fixed pack total.', 'plugin-multi-packs'); ?></p>
+		<div class="wc-multi-packs-admin" data-name-base="wc_multi_packs_groups" data-default-tiers="<?php echo esc_attr($global_tiers); ?>">
+			<?php if (! $has_custom_groups && ! $is_disabled) : ?>
+				<div class="notice notice-info inline">
+					<p><?php esc_html_e('Global pack settings are active for this product. Add custom groups below to override them, or check the box to disable pack tables entirely.', 'plugin-multi-packs'); ?></p>
+				</div>
+			<?php endif; ?>
+			<p>
+				<label>
+					<input type="checkbox" name="wc_multi_packs_disabled" value="1" <?php checked($is_disabled); ?> />
+					<strong><?php esc_html_e('Disable pack tables for this product', 'plugin-multi-packs'); ?></strong>
+				</label>
+			</p>
+			<p><?php esc_html_e('Add one or more pack groups. Each row can use a BOGO discount or a fixed pack total. Leave all groups empty to use global defaults.', 'plugin-multi-packs'); ?></p>
 			<div class="wc-multi-packs-admin__groups" data-groups>
 				<?php foreach ($groups as $group_index => $group) : ?>
-					<?php $this->render_group_editor($group_index, $group); ?>
+					<?php $this->render_group_editor($group_index, $group, false, 'wc_multi_packs_groups'); ?>
 				<?php endforeach; ?>
 			</div>
 			<p>
@@ -204,7 +270,12 @@ final class WC_Multi_Packs_Plugin {
 		<?php
 	}
 
-	private function render_group_editor(int|string $group_index, array $group, bool $is_template = false): void {
+	private function render_group_editor(int|string $group_index, array $group, bool $is_template = false, string $name_base = 'wc_multi_packs_groups'): void {
+		if ($is_template) {
+			$name_base   = '__name_base__';
+			$group_index = '__group_index__';
+		}
+
 		$group = wp_parse_args(
 			$group,
 			[
@@ -226,13 +297,13 @@ final class WC_Multi_Packs_Plugin {
 				<p>
 					<label>
 						<strong><?php esc_html_e('Group title', 'plugin-multi-packs'); ?></strong><br />
-						<input type="text" class="widefat" name="wc_multi_packs_groups[<?php echo esc_attr((string) $group_index); ?>][group_title]" value="<?php echo esc_attr((string) $group['group_title']); ?>" />
+						<input type="text" class="widefat" name="<?php echo esc_attr($name_base . '[' . $group_index . '][group_title]'); ?>" value="<?php echo esc_attr((string) $group['group_title']); ?>" placeholder="<?php esc_attr_e('e.g. Buy a pack of 6 (5 bought + 1 free)', 'plugin-multi-packs'); ?>" />
 					</label>
 				</p>
 				<p>
 					<label>
 						<strong><?php esc_html_e('Specific tiers (optional)', 'plugin-multi-packs'); ?></strong><br />
-						<input type="text" class="widefat" name="wc_multi_packs_groups[<?php echo esc_attr((string) $group_index); ?>][tiers_override]" value="<?php echo esc_attr((string) $group['tiers_override']); ?>" placeholder="<?php esc_attr_e('Example: 6, 12, 24', 'plugin-multi-packs'); ?>" />
+						<input type="text" class="widefat" name="<?php echo esc_attr($name_base . '[' . $group_index . '][tiers_override]'); ?>" value="<?php echo esc_attr((string) $group['tiers_override']); ?>" placeholder="<?php esc_attr_e('Example: 6, 12, 24', 'plugin-multi-packs'); ?>" />
 					</label>
 				</p>
 				<table class="widefat striped">
@@ -247,7 +318,7 @@ final class WC_Multi_Packs_Plugin {
 					</thead>
 					<tbody data-lines data-group-index="<?php echo esc_attr((string) $group_index); ?>">
 						<?php foreach ($lines as $line_index => $line) : ?>
-							<?php $this->render_line_editor($group_index, $line_index, $line, $is_template); ?>
+							<?php $this->render_line_editor($group_index, $line_index, $line, $is_template, $name_base); ?>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
@@ -259,7 +330,13 @@ final class WC_Multi_Packs_Plugin {
 		<?php
 	}
 
-	private function render_line_editor(int|string $group_index, int|string $line_index, array $line, bool $is_template = false): void {
+	private function render_line_editor(int|string $group_index, int|string $line_index, array $line, bool $is_template = false, string $name_base = 'wc_multi_packs_groups'): void {
+		if ($is_template) {
+			$name_base   = '__name_base__';
+			$group_index = '__group_index__';
+			$line_index  = '__line_index__';
+		}
+
 		$line = wp_parse_args(
 			$line,
 			[
@@ -271,7 +348,7 @@ final class WC_Multi_Packs_Plugin {
 				'fixed_price'    => '',
 			]
 		);
-		$name = 'wc_multi_packs_groups[' . $group_index . '][lines][' . $line_index . ']';
+		$name = $name_base . '[' . $group_index . '][lines][' . $line_index . ']';
 		?>
 		<tr class="wc-multi-packs-admin__line">
 			<td>
@@ -318,6 +395,13 @@ final class WC_Multi_Packs_Plugin {
 			return;
 		}
 
+		// Save the "disabled" flag.
+		if (! empty($_POST['wc_multi_packs_disabled'])) {
+			update_post_meta($post_id, self::META_DISABLED, '1');
+		} else {
+			delete_post_meta($post_id, self::META_DISABLED);
+		}
+
 		$raw_groups = $_POST['wc_multi_packs_groups'] ?? [];
 		$groups     = $this->sanitize_groups($raw_groups);
 
@@ -346,6 +430,9 @@ final class WC_Multi_Packs_Plugin {
 		}
 
 		if ('woocommerce_page_wc-multi-packs' === $hook) {
+			wp_register_script('wc-multi-packs-admin', '', [], '1.0.0', true);
+			wp_enqueue_script('wc-multi-packs-admin');
+			wp_add_inline_script('wc-multi-packs-admin', $this->get_admin_script());
 			wp_register_style('wc-multi-packs-admin', false, [], '1.0.0');
 			wp_enqueue_style('wc-multi-packs-admin');
 			wp_add_inline_style('wc-multi-packs-admin', $this->get_admin_style());
@@ -634,8 +721,15 @@ final class WC_Multi_Packs_Plugin {
 		$mode           = (string) ($line['mode'] ?? 'bogo');
 
 		if ('fixed' === $mode) {
-			$fixed_price = max(0, (float) ($line['fixed_price'] ?? 0));
-			return wc_price($fixed_price);
+			$fixed_price    = max(0, (float) ($line['fixed_price'] ?? 0));
+			$unit_price     = $units_per_pack > 0 ? $fixed_price / $units_per_pack : 0;
+
+			return sprintf(
+				'%1$s <small class="wc-multi-packs__unit-price">%2$s</small>',
+				wc_price($fixed_price),
+				/* translators: %s: formatted unit price */
+				esc_html(sprintf(__('(i.e. %s / unit)', 'plugin-multi-packs'), strip_tags(wc_price($unit_price))))
+			);
 		}
 
 		$buy  = max(0, (int) ($line['bogo_buy'] ?? 0));
@@ -648,15 +742,24 @@ final class WC_Multi_Packs_Plugin {
 			$cycles      = intdiv($units_per_pack, $cycle_units);
 			$free_units  = $cycles * $free;
 			$total_price = $base_price * max(0, $units_per_pack - $free_units);
+			$unit_price  = $units_per_pack > 0 ? $total_price / $units_per_pack : 0;
 
 			return sprintf(
-				'%1$s <small class="wc-multi-packs__discount-note">%2$s</small>',
+				'%1$s <small class="wc-multi-packs__unit-price">%2$s</small>',
 				wc_price($total_price),
-				esc_html(sprintf(__('BOGO %1$d + %2$d', 'plugin-multi-packs'), $buy, $free))
+				/* translators: %s: formatted unit price */
+				esc_html(sprintf(__('(i.e. %s / unit)', 'plugin-multi-packs'), strip_tags(wc_price($unit_price))))
 			);
 		}
 
-		return wc_price($total_price);
+		$unit_price = $units_per_pack > 0 ? $total_price / $units_per_pack : $base_price;
+
+		return sprintf(
+			'%1$s <small class="wc-multi-packs__unit-price">%2$s</small>',
+			wc_price($total_price),
+			/* translators: %s: formatted unit price */
+			esc_html(sprintf(__('(i.e. %s / unit)', 'plugin-multi-packs'), strip_tags(wc_price($unit_price))))
+		);
 	}
 
 	private function sanitize_groups(mixed $groups): array {
@@ -734,15 +837,31 @@ final class WC_Multi_Packs_Plugin {
 	private function get_default_settings(): array {
 		return [
 			'default_tiers' => "6\n12\n24",
+			'global_groups' => [],
 			'custom_css'    => '',
 			'custom_js'     => '',
 		];
 	}
 
-	private function get_product_groups(int $product_id): array {
+	private function get_raw_product_groups(int $product_id): array {
 		$groups = get_post_meta($product_id, self::META_KEY, true);
 
 		return is_array($groups) ? $groups : [];
+	}
+
+	private function get_product_groups(int $product_id): array {
+		// If packs are explicitly disabled for this product, return nothing.
+		if (get_post_meta($product_id, self::META_DISABLED, true)) {
+			return [];
+		}
+
+		// Use per-product groups when set; otherwise fall back to global groups.
+		$groups = $this->get_raw_product_groups($product_id);
+		if ([] !== $groups) {
+			return $groups;
+		}
+
+		return $this->get_settings()['global_groups'] ?? [];
 	}
 
 	private function product_has_packs(int $product_id): bool {
@@ -751,7 +870,7 @@ final class WC_Multi_Packs_Plugin {
 
 	private function get_admin_script(): string {
 		return <<<JS
-(function(){const groupsContainer=document.querySelector('[data-groups]');if(!groupsContainer){return;}const groupTemplate=document.getElementById('tmpl-wc-multi-packs-group');const lineTemplate=document.getElementById('tmpl-wc-multi-packs-line');const refreshModes=(scope)=>{scope.querySelectorAll('[data-pack-mode]').forEach((select)=>{const wrapper=select.closest('tr').querySelector('[data-mode-fields]');if(!wrapper){return;}wrapper.querySelectorAll('[data-mode]').forEach((node)=>{node.style.display=node.getAttribute('data-mode')===select.value?'inline-flex':'none';});});};const nextGroupIndex=()=>groupsContainer.querySelectorAll('.wc-multi-packs-admin__group').length;const nextLineIndex=(tbody)=>tbody.querySelectorAll('.wc-multi-packs-admin__line').length;document.addEventListener('click',(event)=>{const addGroup=event.target.closest('[data-add-group]');if(addGroup&&groupTemplate){event.preventDefault();groupsContainer.insertAdjacentHTML('beforeend',groupTemplate.innerHTML.replaceAll('__group_index__',String(nextGroupIndex())));refreshModes(groupsContainer);return;}const addLine=event.target.closest('[data-add-line]');if(addLine&&lineTemplate){event.preventDefault();const groupIndex=addLine.getAttribute('data-group-index');const tbody=addLine.closest('.inside').querySelector('[data-lines]');if(!tbody){return;}tbody.insertAdjacentHTML('beforeend',lineTemplate.innerHTML.replaceAll('__group_index__',String(groupIndex)).replaceAll('__line_index__',String(nextLineIndex(tbody))));refreshModes(tbody);return;}const removeGroup=event.target.closest('[data-remove-group]');if(removeGroup){event.preventDefault();removeGroup.closest('.wc-multi-packs-admin__group')?.remove();return;}const removeLine=event.target.closest('[data-remove-line]');if(removeLine){event.preventDefault();const tbody=removeLine.closest('tbody');removeLine.closest('tr')?.remove();if(tbody&&tbody.children.length===0&&lineTemplate){const groupIndex=tbody.getAttribute('data-group-index')||'0';tbody.insertAdjacentHTML('beforeend',lineTemplate.innerHTML.replaceAll('__group_index__',groupIndex).replaceAll('__line_index__','0'));}refreshModes(groupsContainer);}});document.addEventListener('change',(event)=>{if(event.target.matches('[data-pack-mode]')){refreshModes(event.target.closest('tr'));}});refreshModes(groupsContainer);})(); 
+(function(){const groupTemplate=document.getElementById('tmpl-wc-multi-packs-group');const lineTemplate=document.getElementById('tmpl-wc-multi-packs-line');const refreshModes=(scope)=>{scope.querySelectorAll('[data-pack-mode]').forEach((select)=>{const wrapper=select.closest('tr').querySelector('[data-mode-fields]');if(!wrapper){return;}wrapper.querySelectorAll('[data-mode]').forEach((node)=>{node.style.display=node.getAttribute('data-mode')===select.value?'inline-flex':'none';});});};const nextGroupIndex=(container)=>container.querySelectorAll('.wc-multi-packs-admin__group').length;const nextLineIndex=(tbody)=>tbody.querySelectorAll('.wc-multi-packs-admin__line').length;const getNameBase=(el)=>{const admin=el.closest('.wc-multi-packs-admin');return(admin&&admin.dataset.nameBase)?admin.dataset.nameBase:'wc_multi_packs_groups';};document.addEventListener('click',(event)=>{const addGroup=event.target.closest('[data-add-group]');if(addGroup&&groupTemplate){event.preventDefault();const container=addGroup.closest('[data-groups]');if(!container){return;}const nameBase=getNameBase(addGroup);container.insertAdjacentHTML('beforeend',groupTemplate.innerHTML.replaceAll('__name_base__',nameBase).replaceAll('__group_index__',String(nextGroupIndex(container))));refreshModes(container);return;}const addLine=event.target.closest('[data-add-line]');if(addLine&&lineTemplate){event.preventDefault();const groupIndex=addLine.getAttribute('data-group-index');const tbody=addLine.closest('.inside').querySelector('[data-lines]');if(!tbody){return;}const nameBase=getNameBase(addLine);tbody.insertAdjacentHTML('beforeend',lineTemplate.innerHTML.replaceAll('__name_base__',nameBase).replaceAll('__group_index__',String(groupIndex)).replaceAll('__line_index__',String(nextLineIndex(tbody))));refreshModes(tbody);return;}const removeGroup=event.target.closest('[data-remove-group]');if(removeGroup){event.preventDefault();removeGroup.closest('.wc-multi-packs-admin__group')?.remove();return;}const removeLine=event.target.closest('[data-remove-line]');if(removeLine){event.preventDefault();const tbody=removeLine.closest('tbody');removeLine.closest('tr')?.remove();if(tbody&&tbody.children.length===0&&lineTemplate){const groupIndex=tbody.getAttribute('data-group-index')||'0';const nameBase=getNameBase(tbody);tbody.insertAdjacentHTML('beforeend',lineTemplate.innerHTML.replaceAll('__name_base__',nameBase).replaceAll('__group_index__',groupIndex).replaceAll('__line_index__','0'));}refreshModes(removeLine.closest('.wc-multi-packs-admin')||document);}});document.addEventListener('change',(event)=>{if(event.target.matches('[data-pack-mode]')){refreshModes(event.target.closest('tr'));}});document.querySelectorAll('[data-groups]').forEach((container)=>{refreshModes(container);});})(); 
 JS;
 	}
 

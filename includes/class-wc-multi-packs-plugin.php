@@ -112,7 +112,7 @@ final class WC_Multi_Packs_Plugin {
 
 		return [
 			'default_tiers' => $this->sanitize_tiers_text($settings['default_tiers'] ?? ''),
-			'global_groups' => $this->sanitize_groups($settings['global_groups'] ?? []),
+			'global_groups' => $this->sanitize_groups($settings['global_groups'] ?? [], true),
 			'custom_css'    => sanitize_textarea_field(wp_unslash((string) ($settings['custom_css'] ?? ''))),
 			'custom_js'     => sanitize_textarea_field(wp_unslash((string) ($settings['custom_js'] ?? ''))),
 		];
@@ -187,7 +187,7 @@ final class WC_Multi_Packs_Plugin {
 			<p class="description"><?php esc_html_e('These groups are displayed on every product page. Products with their own groups configured below will use those instead.', 'plugin-multi-packs'); ?></p>
 			<div class="wc-multi-packs-admin__groups" data-groups>
 				<?php foreach ($groups as $group_index => $group) : ?>
-					<?php $this->render_group_editor($group_index, $group, false, $name_base); ?>
+					<?php $this->render_group_editor($group_index, $group, false, $name_base, true); ?>
 				<?php endforeach; ?>
 			</div>
 			<p>
@@ -195,10 +195,10 @@ final class WC_Multi_Packs_Plugin {
 			</p>
 		</div>
 		<script type="text/html" id="tmpl-wc-multi-packs-group">
-			<?php $this->render_group_editor('__group_index__', ['group_title' => '', 'tiers_override' => '', 'lines' => [$line_template]], true); ?>
+			<?php $this->render_group_editor('__group_index__', ['group_title' => '', 'tiers_override' => '', 'lines' => [$line_template]], true, 'wc_multi_packs_groups', true); ?>
 		</script>
 		<script type="text/html" id="tmpl-wc-multi-packs-line">
-			<?php $this->render_line_editor('__group_index__', '__line_index__', $line_template, true); ?>
+			<?php $this->render_line_editor('__group_index__', '__line_index__', $line_template, true, 'wc_multi_packs_groups', true); ?>
 		</script>
 		<?php
 	}
@@ -270,7 +270,7 @@ final class WC_Multi_Packs_Plugin {
 		<?php
 	}
 
-	private function render_group_editor(int|string $group_index, array $group, bool $is_template = false, string $name_base = 'wc_multi_packs_groups'): void {
+	private function render_group_editor(int|string $group_index, array $group, bool $is_template = false, string $name_base = 'wc_multi_packs_groups', bool $is_global = false): void {
 		if ($is_template) {
 			$name_base   = '__name_base__';
 			$group_index = '__group_index__';
@@ -309,8 +309,10 @@ final class WC_Multi_Packs_Plugin {
 				<table class="widefat striped">
 					<thead>
 						<tr>
-							<th><?php esc_html_e('Packaging', 'plugin-multi-packs'); ?></th>
-							<th><?php esc_html_e('Units / pack', 'plugin-multi-packs'); ?></th>
+							<?php if (! $is_global) : ?>
+								<th><?php esc_html_e('Packaging', 'plugin-multi-packs'); ?></th>
+								<th><?php esc_html_e('Units / pack', 'plugin-multi-packs'); ?></th>
+							<?php endif; ?>
 							<th><?php esc_html_e('Mode', 'plugin-multi-packs'); ?></th>
 							<th><?php esc_html_e('BOGO / Fixed price', 'plugin-multi-packs'); ?></th>
 							<th><?php esc_html_e('Action', 'plugin-multi-packs'); ?></th>
@@ -318,7 +320,7 @@ final class WC_Multi_Packs_Plugin {
 					</thead>
 					<tbody data-lines data-group-index="<?php echo esc_attr((string) $group_index); ?>">
 						<?php foreach ($lines as $line_index => $line) : ?>
-							<?php $this->render_line_editor($group_index, $line_index, $line, $is_template, $name_base); ?>
+							<?php $this->render_line_editor($group_index, $line_index, $line, $is_template, $name_base, $is_global); ?>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
@@ -330,7 +332,7 @@ final class WC_Multi_Packs_Plugin {
 		<?php
 	}
 
-	private function render_line_editor(int|string $group_index, int|string $line_index, array $line, bool $is_template = false, string $name_base = 'wc_multi_packs_groups'): void {
+	private function render_line_editor(int|string $group_index, int|string $line_index, array $line, bool $is_template = false, string $name_base = 'wc_multi_packs_groups', bool $is_global = false): void {
 		if ($is_template) {
 			$name_base   = '__name_base__';
 			$group_index = '__group_index__';
@@ -351,12 +353,14 @@ final class WC_Multi_Packs_Plugin {
 		$name = $name_base . '[' . $group_index . '][lines][' . $line_index . ']';
 		?>
 		<tr class="wc-multi-packs-admin__line">
-			<td>
-				<input type="text" class="widefat" name="<?php echo esc_attr($name); ?>[pack_label]" value="<?php echo esc_attr((string) $line['pack_label']); ?>" placeholder="<?php esc_attr_e('190gr x 6', 'plugin-multi-packs'); ?>" />
-			</td>
-			<td>
-				<input type="number" class="small-text" min="1" step="1" name="<?php echo esc_attr($name); ?>[units_per_pack]" value="<?php echo esc_attr((string) $line['units_per_pack']); ?>" />
-			</td>
+			<?php if (! $is_global) : ?>
+				<td>
+					<input type="text" class="widefat" name="<?php echo esc_attr($name); ?>[pack_label]" value="<?php echo esc_attr((string) $line['pack_label']); ?>" placeholder="<?php esc_attr_e('190gr x 6', 'plugin-multi-packs'); ?>" />
+				</td>
+				<td>
+					<input type="number" class="small-text" min="1" step="1" name="<?php echo esc_attr($name); ?>[units_per_pack]" value="<?php echo esc_attr((string) $line['units_per_pack']); ?>" />
+				</td>
+			<?php endif; ?>
 			<td>
 				<select name="<?php echo esc_attr($name); ?>[mode]" data-pack-mode>
 					<option value="bogo" <?php selected('bogo', $line['mode']); ?>><?php esc_html_e('BOGO', 'plugin-multi-packs'); ?></option>
@@ -762,7 +766,7 @@ final class WC_Multi_Packs_Plugin {
 		);
 	}
 
-	private function sanitize_groups(mixed $groups): array {
+	private function sanitize_groups(mixed $groups, bool $is_global = false): array {
 		if (! is_array($groups)) {
 			return [];
 		}
@@ -791,7 +795,7 @@ final class WC_Multi_Packs_Plugin {
 					$bogo_free      = max(0, absint($line['bogo_free'] ?? 0));
 					$fixed_price    = wc_format_decimal(wp_unslash((string) ($line['fixed_price'] ?? '')));
 
-					if ('' === $pack_label || $units_per_pack < 1) {
+					if (! $is_global && ('' === $pack_label || $units_per_pack < 1)) {
 						continue;
 					}
 
@@ -861,7 +865,67 @@ final class WC_Multi_Packs_Plugin {
 			return $groups;
 		}
 
-		return $this->get_settings()['global_groups'] ?? [];
+		$global_groups = $this->get_settings()['global_groups'] ?? [];
+		if ([] === $global_groups) {
+			return [];
+		}
+
+		return $this->expand_global_groups($global_groups);
+	}
+
+	private function expand_global_groups(array $global_groups): array {
+		$settings      = $this->get_settings();
+		$default_tiers = $this->parse_tiers($settings['default_tiers']);
+		$expanded      = [];
+
+		foreach ($global_groups as $group) {
+			$tiers_text = trim((string) ($group['tiers_override'] ?? ''));
+			$tiers      = '' !== $tiers_text ? $this->parse_tiers($tiers_text) : $default_tiers;
+
+			if ([] === $tiers) {
+				continue;
+			}
+
+			$bogo_lines     = is_array($group['lines']) ? $group['lines'] : [];
+			$expanded_lines = [];
+
+			foreach ($tiers as $tier) {
+				foreach ($bogo_lines as $bogo_line) {
+					$expanded_lines[] = [
+						'pack_label'     => 'x' . $tier,
+						'units_per_pack' => $tier,
+						'mode'           => (string) ($bogo_line['mode'] ?? 'bogo'),
+						'bogo_buy'       => (int) ($bogo_line['bogo_buy'] ?? 0),
+						'bogo_free'      => (int) ($bogo_line['bogo_free'] ?? 0),
+						'fixed_price'    => (float) ($bogo_line['fixed_price'] ?? 0.0),
+					];
+				}
+			}
+
+			if ([] !== $expanded_lines) {
+				$expanded[] = [
+					'group_title'    => (string) ($group['group_title'] ?? ''),
+					'tiers_override' => (string) ($group['tiers_override'] ?? ''),
+					'lines'          => $expanded_lines,
+				];
+			}
+		}
+
+		return $expanded;
+	}
+
+	private function parse_tiers(string $tiers_text): array {
+		$values = preg_split('/[\s,]+/', $tiers_text, -1, PREG_SPLIT_NO_EMPTY);
+		$result = [];
+
+		foreach ($values as $v) {
+			$n = (int) $v;
+			if ($n > 0) {
+				$result[] = $n;
+			}
+		}
+
+		return $result;
 	}
 
 	private function product_has_packs(int $product_id): bool {

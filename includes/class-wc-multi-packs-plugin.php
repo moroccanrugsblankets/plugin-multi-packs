@@ -40,6 +40,7 @@ final class WC_Multi_Packs_Plugin {
 		add_action('woocommerce_before_calculate_totals', [$this, 'apply_pack_pricing'], 20);
 		add_filter('woocommerce_get_item_data', [$this, 'render_cart_item_data'], 10, 2);
 		add_filter('woocommerce_cart_item_quantity', [$this, 'render_locked_cart_quantity'], 10, 3);
+		add_filter('woocommerce_widget_cart_item_quantity', [$this, 'render_widget_cart_item_quantity'], 10, 3);
 		add_filter('woocommerce_add_to_cart_validation', [$this, 'validate_pack_add_to_cart'], 10, 3);
 	}
 
@@ -716,6 +717,57 @@ final class WC_Multi_Packs_Plugin {
 			'%1$s<br /><small>%2$s</small>',
 			esc_html((string) $cart_item['quantity']),
 			esc_html(sprintf(__('%1$d pack(s) × %2$d units', 'plugin-multi-packs'), $requested_packs, $units_per_pack))
+		);
+	}
+
+	public function render_widget_cart_item_quantity(string $product_quantity, array $cart_item, string $cart_item_key): string {
+		if (! isset($cart_item['wc_multi_pack'])) {
+			return $product_quantity;
+		}
+
+		$pack = $cart_item['wc_multi_pack'];
+		$mode = (string) ($pack['mode'] ?? 'bogo');
+
+		if ('bogo' !== $mode) {
+			return $product_quantity;
+		}
+
+		$buy  = max(0, (int) ($pack['bogo_buy'] ?? 0));
+		$free = max(0, (int) ($pack['bogo_free'] ?? 0));
+
+		if ($buy <= 0 || $free <= 0) {
+			return $product_quantity;
+		}
+
+		$quantity        = max(1, (int) $cart_item['quantity']);
+		$cycle_units     = $buy + $free;
+		$cycles          = intdiv($quantity, $cycle_units);
+		$free_units      = $cycles * $free;
+		$paid_units      = $quantity - $free_units;
+
+		$product = isset($cart_item['data']) && $cart_item['data'] instanceof \WC_Product ? $cart_item['data'] : null;
+
+		$base_unit_price = isset($pack['base_unit_price']) ? (float) $pack['base_unit_price'] : 0.0;
+		if ($base_unit_price <= 0 && $product) {
+			$base_unit_price = (float) $product->get_regular_price();
+		}
+		if ($base_unit_price <= 0 && $product) {
+			$base_unit_price = (float) $product->get_price('edit');
+		}
+
+		$display_price = $product
+			? wc_get_price_to_display($product, ['price' => $base_unit_price])
+			: $base_unit_price;
+
+		return sprintf(
+			'<span class="quantity">%1$s &times; %2$s<br /><small>%3$s</small></span>',
+			esc_html((string) $paid_units),
+			wc_price($display_price),
+			esc_html(sprintf(
+				/* translators: %d: number of free units */
+				_n('%d offert', '%d offerts', $free_units, 'plugin-multi-packs'),
+				$free_units
+			))
 		);
 	}
 

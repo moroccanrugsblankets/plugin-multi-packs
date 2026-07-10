@@ -512,7 +512,7 @@ final class WC_Multi_Packs_Plugin {
 		}
 
 		?>
-		<div class="wc-multi-packs"<?php echo $is_variable ? ' data-variable="1" style="display:none"' : ''; ?>>
+		<div class="wc-multi-packs<?php echo $is_variable ? ' wc-multi-packs--variable' : ''; ?>"<?php echo $is_variable ? ' data-variable="1"' : ''; ?>>
 			<h3 class="wc-multi-packs__title"><?php esc_html_e('Order by packs', 'plugin-multi-packs'); ?></h3>
 			<?php foreach ($groups as $group_index => $group) : ?>
 				<div class="wc-multi-packs__group">
@@ -651,14 +651,13 @@ final class WC_Multi_Packs_Plugin {
 			return;
 		}
 
-		// Use the variation's own price as the base unit price when applicable.
-		$price_product = $variation_id > 0 ? (wc_get_product($variation_id) ?: $product) : $product;
+		// Use the variation's own price and stock when applicable.
+		$variation_product = $variation_id > 0 ? (wc_get_product($variation_id) ?: $product) : $product;
 
 		$units_per_pack = max(1, (int) $line['units_per_pack']);
 		$unit_quantity  = $pack_qty * $units_per_pack;
 
-		$stock_product = $variation_id > 0 ? (wc_get_product($variation_id) ?: $product) : $product;
-		if (! $stock_product->has_enough_stock($unit_quantity)) {
+		if (! $variation_product->has_enough_stock($unit_quantity)) {
 			wc_add_notice(__('Not enough stock available for this pack.', 'plugin-multi-packs'), 'error');
 			return;
 		}
@@ -673,7 +672,7 @@ final class WC_Multi_Packs_Plugin {
 				'bogo_buy'          => (int) $line['bogo_buy'],
 				'bogo_free'         => (int) $line['bogo_free'],
 				'fixed_price'       => (float) $line['fixed_price'],
-				'base_unit_price'   => (float) $price_product->get_price('edit'),
+				'base_unit_price'   => (float) $variation_product->get_price('edit'),
 				'unique_key'        => wp_generate_uuid4(),
 			],
 		];
@@ -1063,7 +1062,7 @@ JS;
 
 	private function get_variable_product_script(): string {
 		return <<<'JS'
-(function(){var wrap=document.querySelector('.wc-multi-packs[data-variable]');if(!wrap){return;}var vform=document.querySelector('.variations_form');if(!vform||typeof jQuery==='undefined'){return;}var d=typeof wcMultiPacksData!=='undefined'?wcMultiPacksData:{};function fmtPrice(n){var nd=parseInt(d.numDecimals||'2',10);var fixed=(+n).toFixed(nd);var parts=fixed.split('.');var ts=d.thousandSep||'';if(ts){parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,ts);}var num=nd>0?parts.join(d.decimalSep||'.'):parts[0];var sym=d.currencySymbol||'';var pos=d.currencyPos||'left';if(pos==='left')return sym+num;if(pos==='right')return num+sym;if(pos==='left_space')return sym+'\u00a0'+num;return num+'\u00a0'+sym;}function buildPrice(total,perUnit){var lbl=(d.ieLabel||'(i.e. %s / unit)').replace('%s',fmtPrice(perUnit));return fmtPrice(total)+' <small class="wc-multi-packs__unit-price">'+lbl+'</small>';}function calcRow(unitPrice,row){var n=Math.max(1,parseInt(row.dataset.unitsPerPack||'1',10));var mode=row.dataset.mode||'bogo';if(mode==='fixed'){var fp=parseFloat(row.dataset.fixedPrice)||0;return buildPrice(fp,n>0?fp/n:0);}var buy=parseInt(row.dataset.bogoBuy||'0',10);var free=parseInt(row.dataset.bogoFree||'0',10);var total=unitPrice*n;if(buy>0&&free>0){var cy=buy+free;var cycles=Math.floor(n/cy);total=unitPrice*Math.max(0,n-(cycles*free));}return buildPrice(total,n>0?total/n:unitPrice);}jQuery(vform).on('found_variation',function(e,v){wrap.style.display='';var label='';document.querySelectorAll('.variations select').forEach(function(s){var o=s.options[s.selectedIndex];if(o&&o.value){label+=(label?' ':'')+o.text;}});var price=parseFloat(v.display_price)||0;var vid=parseInt(v.variation_id,10)||0;var attrs=v.attributes||{};wrap.querySelectorAll('[data-pack-line]').forEach(function(row){var lc=row.querySelector('[data-pack-label]');if(lc){var base=row.dataset.basePackLabel||'';lc.textContent=label?(label+' '+base):base;}var pc=row.querySelector('[data-pack-price]');if(pc){pc.innerHTML=calcRow(price,row);}var vidIn=row.querySelector('[data-pack-variation-id]');if(vidIn){vidIn.value=String(vid);}row.querySelectorAll('[data-pack-variation-attr]').forEach(function(inp){var k=inp.getAttribute('data-pack-variation-attr');inp.value=(k&&attrs[k])?attrs[k]:'';});});});jQuery(vform).on('reset_data',function(){wrap.style.display='none';});})();
+(function(){var wrap=document.querySelector('.wc-multi-packs[data-variable]');if(!wrap){return;}var vform=document.querySelector('.variations_form');if(!vform||typeof jQuery==='undefined'){return;}var d=typeof wcMultiPacksData!=='undefined'?wcMultiPacksData:{};function fmtPrice(n){var nd=parseInt(d.numDecimals||'2',10);var fixed=(+n).toFixed(nd);var parts=fixed.split('.');var ts=d.thousandSep||'';if(ts){parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,ts);}var num=nd>0?parts.join(d.decimalSep||'.'):parts[0];var sym=d.currencySymbol||'';var pos=d.currencyPos||'left';if(pos==='left')return sym+num;if(pos==='right')return num+sym;if(pos==='left_space')return sym+'\u00a0'+num;return num+'\u00a0'+sym;}function buildPrice(total,perUnit){var lbl=(d.ieLabel||'(i.e. %s / unit)').replace('%s',fmtPrice(perUnit));return fmtPrice(total)+' <small class="wc-multi-packs__unit-price">'+lbl+'</small>';}function calcRow(unitPrice,row){var n=Math.max(1,parseInt(row.dataset.unitsPerPack||'1',10));var mode=row.dataset.mode||'bogo';if(mode==='fixed'){var fp=parseFloat(row.dataset.fixedPrice)||0;return buildPrice(fp,n>0?fp/n:0);}var buy=parseInt(row.dataset.bogoBuy||'0',10);var free=parseInt(row.dataset.bogoFree||'0',10);var total=unitPrice*n;if(buy>0&&free>0){var cy=buy+free;var cycles=Math.floor(n/cy);total=unitPrice*Math.max(0,n-(cycles*free));}return buildPrice(total,n>0?total/n:unitPrice);}jQuery(vform).on('found_variation',function(e,v){wrap.classList.remove('wc-multi-packs--variable');var label='';document.querySelectorAll('.variations select').forEach(function(s){var o=s.options[s.selectedIndex];if(o&&o.value){label+=(label?' ':'')+o.text;}});var price=parseFloat(v.display_price)||0;var vid=parseInt(v.variation_id,10)||0;var attrs=v.attributes||{};wrap.querySelectorAll('[data-pack-line]').forEach(function(row){var lc=row.querySelector('[data-pack-label]');if(lc){var base=row.dataset.basePackLabel||'';lc.textContent=label?(label+' '+base):base;}var pc=row.querySelector('[data-pack-price]');if(pc){pc.innerHTML=calcRow(price,row);}var vidIn=row.querySelector('[data-pack-variation-id]');if(vidIn){vidIn.value=String(vid);}row.querySelectorAll('[data-pack-variation-attr]').forEach(function(inp){var k=inp.getAttribute('data-pack-variation-attr');inp.value=(k&&attrs[k])?attrs[k]:'';});});});jQuery(vform).on('reset_data',function(){wrap.classList.add('wc-multi-packs--variable');});})();
 JS;
 	}
 }
